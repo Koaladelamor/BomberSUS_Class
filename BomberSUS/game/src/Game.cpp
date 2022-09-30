@@ -16,6 +16,8 @@
 #include <fstream>
 #include <string>
 #include <map>
+#include <vector>
+#include <math.h>
 
 //------------------------------------------------------------------------------------
 // Program main entry point
@@ -41,7 +43,26 @@ int objects_h = 0;
 std::string** objects;
 
 Vector3** fg_positions;
-Vector3 player1Position;
+
+struct Player {
+    Vector3 position;
+    Color color;
+    int maxBombs;
+    int num;
+    bool dead;
+};
+
+struct Bombs {
+    float pos_x;
+    float pos_z;
+    float timeToExplode;
+};
+
+std::vector <Player*> players;
+
+std::vector <Bombs*> player1Bombs;
+std::vector <Bombs*> player2Bombs;
+
 
 int LoadMap() {
     std::string temp;
@@ -226,6 +247,7 @@ int LoadMap() {
         for (size_t j = 0; j < objects_w; j++)
         {
             std::getline(file, temp, ';');
+
             objects[i][j] = temp;
             /*if (j == objects_w - 1) {
                 std::cout << objects[i][j];
@@ -256,12 +278,39 @@ bool Collision(Vector3 pos) {
     {
         for (size_t j = 0; j < objects_w; j++)
         {
-            if (fg_positions[i][j].x == pos.x && fg_positions[i][j].y == pos.y, fg_positions[i][j].z == pos.z) {
-                if (objects[i][j] == "X") { return true; }
+            if (fg_positions[i][j].x == pos.x && fg_positions[i][j].y == pos.y && fg_positions[i][j].z == pos.z) {
+                if (objects[i][j] != "0") { return true; }
             }
         }
     }
     return false;
+}
+
+bool Destructible(Vector3 pos) {
+    for (size_t i = 0; i < objects_h; i++)
+    {
+        for (size_t j = 0; j < objects_w; j++)
+        {
+            if (fg_positions[i][j].x == pos.x && fg_positions[i][j].y == pos.y && fg_positions[i][j].z == pos.z) {
+                if (objects[i][j] == "D") { return true; }
+            }
+        }
+    }
+    return false;
+}
+
+void Destroy(Vector3 pos) {
+    for (size_t i = 0; i < objects_h; i++)
+    {
+        for (size_t j = 0; j < objects_w; j++)
+        {
+            if (fg_positions[i][j].x == pos.x && fg_positions[i][j].y == pos.y && fg_positions[i][j].z == pos.z) 
+            {
+                foreground[i][j] = "0";
+                objects[i][j] = "0";
+            }
+        }
+    }
 }
 
 int draw()
@@ -283,15 +332,12 @@ int draw()
     camera.fovy = 45.0f;                                // Camera field-of-view Y
     camera.projection = CAMERA_PERSPECTIVE;             // Camera mode type
 
-
     float x_margin = background_w % 2 == 0 ? .5 : 0;
     float z_margin = background_h % 2 == 0 ? .5 : 0;
     float x_offset = background_w / 2;
     float z_offset = background_h / 2;
 
     Vector3 initialPos = { -x_offset + x_margin, 0, -z_offset + z_margin };
-
-
     
     x_margin = foreground_w % 2 == 0 ? .5 : 0;
     z_margin = foreground_h % 2 == 0 ? .5 : 0;
@@ -331,14 +377,60 @@ int draw()
         tempPos.x = fg_initialPos.x;
     }
 
+    for (size_t i = 0; i < objects_h; i++)
+    {
+        for (size_t j = 0; j < objects_w; j++)
+        {
+            if (objects[i][j] == "1") {
+                objects[i][j] = "0";
+                Player* newPlayer = new Player;
+                newPlayer->position = fg_positions[i][j];
+                newPlayer->color = GREEN;
+                newPlayer->maxBombs = 1;
+                newPlayer->num = 1;
+                newPlayer->dead = false;
+                players.push_back(newPlayer);
+            }
+            else if (objects[i][j] == "2") {
+                objects[i][j] = "0";
+                Player* newPlayer = new Player;
+                newPlayer->position = fg_positions[i][j];
+                newPlayer->color = RED;
+                newPlayer->maxBombs = 1;
+                newPlayer->num = 2;
+                newPlayer->dead = false;
+                players.push_back(newPlayer);
+            }
+        }
+    }
+
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
 
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
+        
         // Update
         //----------------------------------------------------------------------------------
+        float deltaTime = GetFrameTime();
+
+        if (IsKeyPressed(KEY_SPACE) && players[0]->maxBombs > player1Bombs.size()) {
+            Bombs* newBomb = new Bombs;
+            newBomb->pos_x = players[0]->position.x;
+            newBomb->pos_z = players[0]->position.z;
+            newBomb->timeToExplode = 1.5f;
+            player1Bombs.push_back(newBomb);
+        }
+
+        if (IsKeyPressed(KEY_ENTER) && players[1]->maxBombs > player2Bombs.size()) {
+            Bombs* newBomb = new Bombs;
+            newBomb->pos_x = players[1]->position.x;
+            newBomb->pos_z = players[1]->position.z;
+            newBomb->timeToExplode = 1.5f;
+            player2Bombs.push_back(newBomb);
+        }
+
         // TODO: Update your variables here
         //----------------------------------------------------------------------------------
 
@@ -391,57 +483,183 @@ int draw()
             }
         }
 
-        for (size_t i = 0; i < objects_h; i++)
+        for (int i = 0; i < players.size(); i++)
         {
-            for (size_t j = 0; j < objects_w; j++)
+            if (players[i]->num == 1) {
+
+
+                if (IsKeyPressed(KEY_D) && !Collision({ players[i]->position.x + 1, players[i]->position.y, players[i]->position.z })) {
+
+                    players[i]->position = { players[i]->position.x + 1, players[i]->position.y, players[i]->position.z };
+                }
+                else if (IsKeyPressed(KEY_A) && !Collision({ players[i]->position.x - 1, players[i]->position.y, players[i]->position.z })) {
+
+                    players[i]->position = { players[i]->position.x - 1, players[i]->position.y, players[i]->position.z };
+                }
+                else if (IsKeyPressed(KEY_W) && !Collision({ players[i]->position.x, players[i]->position.y, players[i]->position.z - 1 })) {
+
+                    players[i]->position = { players[i]->position.x, players[i]->position.y, players[i]->position.z - 1 };
+                }
+                else if (IsKeyPressed(KEY_S) && !Collision({ players[i]->position.x, players[i]->position.y, players[i]->position.z + 1 })) {
+
+                    players[i]->position = { players[i]->position.x, players[i]->position.y, players[i]->position.z + 1 };
+                }
+
+                if (!players[i]->dead) {
+                    DrawSphere(players[i]->position, 0.4f, players[i]->color);
+                }
+            }
+
+            else if (players[i]->num == 2) {
+
+
+                if (IsKeyPressed(KEY_RIGHT) && !Collision({ players[i]->position.x + 1, players[i]->position.y, players[i]->position.z })) {
+
+                    players[i]->position = { players[i]->position.x + 1, players[i]->position.y, players[i]->position.z };
+                }
+                else if (IsKeyPressed(KEY_LEFT) && !Collision({ players[i]->position.x - 1, players[i]->position.y, players[i]->position.z })) {
+
+                    players[i]->position = { players[i]->position.x - 1, players[i]->position.y, players[i]->position.z };
+                }
+                else if (IsKeyPressed(KEY_UP) && !Collision({ players[i]->position.x, players[i]->position.y, players[i]->position.z - 1 })) {
+
+                    players[i]->position = { players[i]->position.x, players[i]->position.y, players[i]->position.z - 1 };
+                }
+                else if (IsKeyPressed(KEY_DOWN) && !Collision({ players[i]->position.x, players[i]->position.y, players[i]->position.z + 1 })) {
+
+                    players[i]->position = { players[i]->position.x, players[i]->position.y, players[i]->position.z + 1 };
+                }
+                if (!players[i]->dead) {
+                    DrawSphere(players[i]->position, 0.4f, players[i]->color);
+                }
+
+            }
+        }
+
+
+        if (player1Bombs.size() > 0) {
+            for (int i = 0; i < player1Bombs.size(); i++)
             {
-                if (objects[i][j] == "1") {
-                    std::string t = foreground[i][j];
-                    player1Position = fg_positions[i][j];
-                    if (IsKeyPressed(KEY_D) && objects[i][j + 1] == "0") {
-                        player1Position = fg_positions[i][j + 1];
-                        objects[i][j] = "0";
-                        objects[i][j + 1] = "1";
+                player1Bombs[i]->timeToExplode -= deltaTime;
+                if (player1Bombs[i]->timeToExplode > 0) {
+                    DrawSphere({ player1Bombs[i]->pos_x, 1.0f, player1Bombs[i]->pos_z }, 0.1 + 0.2f * abs(sin(player1Bombs[i]->timeToExplode * 2)), BLACK);
+                }
+                else if(player1Bombs[i]->timeToExplode < 0) { 
+                    //Miramos las 4 direcciones si hay un destructible en objects
+                    if (Destructible({ player1Bombs[i]->pos_x + 1, 1, player1Bombs[i]->pos_z })) {
+                        Destroy({ player1Bombs[i]->pos_x + 1, 1, player1Bombs[i]->pos_z });
                     }
-                    else if (IsKeyPressed(KEY_A) && objects[i][j-1] == "0") {
-                        player1Position = fg_positions[i][j-1];
-                        objects[i][j] = "0";
-                        objects[i][j-1] = "1";
+                    else if (Destructible({ player1Bombs[i]->pos_x - 1, 1, player1Bombs[i]->pos_z })) {
+                        Destroy({ player1Bombs[i]->pos_x - 1, 1, player1Bombs[i]->pos_z });
                     }
-                    else if (IsKeyPressed(KEY_W) && objects[i-1][j] == "0") {
-                        player1Position = fg_positions[i-1][j];
-                        objects[i][j] = "0";
-                        objects[i-1][j] = "1";
+                    else if (Destructible({ player1Bombs[i]->pos_x, 1, player1Bombs[i]->pos_z + 1})) {
+                        Destroy({ player1Bombs[i]->pos_x, 1, player1Bombs[i]->pos_z + 1});
                     }
-                    else if (IsKeyPressed(KEY_S) && objects[i + 1][j] == "0") {
-                        player1Position = fg_positions[i + 1][j];
-                        objects[i][j] = "0";
-                        objects[i + 1][j] = "1";
+                    else if (Destructible({ player1Bombs[i]->pos_x, 1, player1Bombs[i]->pos_z -1})) {
+                        Destroy({ player1Bombs[i]->pos_x, 1, player1Bombs[i]->pos_z -1});
+                    }
+                    //Miramos si hay players
+                    if (player1Bombs[i]->pos_x == players[0]->position.x && player1Bombs[i]->pos_z == players[0]->position.z) {
+                        players[0]->dead = true;
+                    }
+                    else if (player1Bombs[i]->pos_x == players[1]->position.x && player1Bombs[i]->pos_z == players[1]->position.z) {
+                        players[1]->dead = true;
                     }
 
-                    DrawSphere(player1Position, 0.4f, BLUE);
+                    if (player1Bombs[i]->pos_x + 1 == players[0]->position.x && player1Bombs[i]->pos_z == players[0]->position.z) {
+                        players[0]->dead = true;
+                    }
+                    else if (player1Bombs[i]->pos_x + 1 == players[1]->position.x && player1Bombs[i]->pos_z == players[1]->position.z) {
+                        players[1]->dead = true;
+                    }
 
-                        /*Vector3 right = {player1Position.x - 1, player1Position.y, player1Position.z};
-                        if(!Collision(right)){
-                            player1Position = right;
-                        }*/
-                    
-                }
-                else if (objects[i][j] == "2") {
-                    std::string t = foreground[i][j];
-                    DrawSphere(fg_positions[i][j], 0.4f, RED);
-                }
-                else if (objects[i][j] == "3") {
-                    std::string t = foreground[i][j];
-                    DrawSphere(fg_positions[i][j], 0.4f, GREEN);
-                }
-                else if (objects[i][j] == "4") {
-                    std::string t = foreground[i][j];
-                    DrawSphere(fg_positions[i][j], 0.4f, YELLOW);
+                    if (player1Bombs[i]->pos_x - 1 == players[0]->position.x && player1Bombs[i]->pos_z == players[0]->position.z) {
+                        players[0]->dead = true;
+                    }
+                    else if (player1Bombs[i]->pos_x - 1 == players[1]->position.x && player1Bombs[i]->pos_z == players[1]->position.z) {
+                        players[1]->dead = true;
+                    }
+
+                    if (player1Bombs[i]->pos_x == players[0]->position.x && player1Bombs[i]->pos_z + 1 == players[0]->position.z) {
+                        players[0]->dead = true;
+                    }
+                    else if (player1Bombs[i]->pos_x == players[1]->position.x && player1Bombs[i]->pos_z + 1 == players[1]->position.z) {
+                        players[1]->dead = true;
+                    }
+
+                    if (player1Bombs[i]->pos_x == players[0]->position.x && player1Bombs[i]->pos_z - 1 == players[0]->position.z) {
+                        players[0]->dead = true;
+                    }
+                    else if (player1Bombs[i]->pos_x == players[1]->position.x && player1Bombs[i]->pos_z - 1 == players[1]->position.z) {
+                        players[1]->dead = true;
+                    }
+
+                    player1Bombs.erase(player1Bombs.begin() + i);
                 }
             }
         }
 
+        if (player2Bombs.size() > 0) {
+            for (int i = 0; i < player2Bombs.size(); i++)
+            {
+                player2Bombs[i]->timeToExplode -= deltaTime;
+                if (player2Bombs[i]->timeToExplode > 0) {
+                    DrawSphere({ player2Bombs[i]->pos_x, 1.0f, player2Bombs[i]->pos_z }, 0.1 + 0.2f * abs(sin(player2Bombs[i]->timeToExplode * 2)), BLACK);
+                }
+                else if (player2Bombs[i]->timeToExplode < 0) {
+                    //Miramos las 4 direcciones si hay un destructible en objects
+                    if (Destructible({ player2Bombs[i]->pos_x + 1, 1, player2Bombs[i]->pos_z })) {
+                        Destroy({ player2Bombs[i]->pos_x + 1, 1, player2Bombs[i]->pos_z });
+                    }
+                    else if (Destructible({ player2Bombs[i]->pos_x - 1, 1, player2Bombs[i]->pos_z })) {
+                        Destroy({ player2Bombs[i]->pos_x - 1, 1, player2Bombs[i]->pos_z });
+                    }
+                    else if (Destructible({ player2Bombs[i]->pos_x, 1, player2Bombs[i]->pos_z + 1 })) {
+                        Destroy({ player2Bombs[i]->pos_x, 1, player2Bombs[i]->pos_z + 1 });
+                    }
+                    else if (Destructible({ player2Bombs[i]->pos_x, 1, player2Bombs[i]->pos_z - 1 })) {
+                        Destroy({ player2Bombs[i]->pos_x, 1, player2Bombs[i]->pos_z - 1 });
+                    }
+                    //Miramos si hay players
+                    if (player2Bombs[i]->pos_x == players[0]->position.x && player2Bombs[i]->pos_z == players[0]->position.z) {
+                        players[0]->dead = true;
+                    }
+                    else if (player2Bombs[i]->pos_x == players[1]->position.x && player2Bombs[i]->pos_z == players[1]->position.z) {
+                        players[1]->dead = true;
+                    }
+
+                    if (player2Bombs[i]->pos_x + 1 == players[0]->position.x && player2Bombs[i]->pos_z == players[0]->position.z) {
+                        players[0]->dead = true;
+                    }
+                    else if (player2Bombs[i]->pos_x + 1 == players[1]->position.x && player2Bombs[i]->pos_z == players[1]->position.z) {
+                        players[1]->dead = true;
+                    }
+
+                    if (player2Bombs[i]->pos_x - 1 == players[0]->position.x && player2Bombs[i]->pos_z == players[0]->position.z) {
+                        players[0]->dead = true;
+                    }
+                    else if (player2Bombs[i]->pos_x - 1 == players[1]->position.x && player2Bombs[i]->pos_z == players[1]->position.z) {
+                        players[1]->dead = true;
+                    }
+
+                    if (player2Bombs[i]->pos_x == players[0]->position.x && player2Bombs[i]->pos_z + 1 == players[0]->position.z) {
+                        players[0]->dead = true;
+                    }
+                    else if (player2Bombs[i]->pos_x == players[1]->position.x && player2Bombs[i]->pos_z + 1 == players[1]->position.z) {
+                        players[1]->dead = true;
+                    }
+
+                    if (player2Bombs[i]->pos_x == players[0]->position.x && player2Bombs[i]->pos_z - 1 == players[0]->position.z) {
+                        players[0]->dead = true;
+                    }
+                    else if (player2Bombs[i]->pos_x == players[1]->position.x && player2Bombs[i]->pos_z - 1 == players[1]->position.z) {
+                        players[1]->dead = true;
+                    }
+
+                    player2Bombs.erase(player2Bombs.begin() + i);
+                }
+            }
+        }
         //DrawCube(fg_initialPos, 1.0f, 1.0f, 1.0f, GREEN);
         //DrawCube(initialPos, 1.0f, 1.0f, 1.0f, RED);
         //DrawCubeWires(cubePosition, 2.0f, 2.0f, 2.0f, MAROON);
