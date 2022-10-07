@@ -24,6 +24,8 @@
 //------------------------------------------------------------------------------------
 
 float version = 0.0;
+std::string bg_music = "";
+
 std::string title = "";
 int totalTextures = 0;
 std::map<std::string, std::string> textures;
@@ -63,6 +65,7 @@ std::vector <Player*> players;
 std::vector <Bombs*> player1Bombs;
 std::vector <Bombs*> player2Bombs;
 
+std::vector <Vector3> powerUps;
 
 int LoadMap() {
     std::string temp;
@@ -111,11 +114,32 @@ int LoadMap() {
 
     std::getline(file, temp);
 
+    if (version >= 0.5) {
+        std::getline(file, temp, ';');
+        std::cout << temp << std::endl;
+        if (temp != "MUSIC") {
+            std::cout << "Error 5 : Music not found" << std::endl;
+            return 5;
+        }
+
+        std::getline(file, temp, ';');
+        std::cout << temp << std::endl;
+        std::string extensionName = temp.substr(temp.find("."));
+        std::cout << "EXTENSION NAME IS: " << extensionName << std::endl;
+        if (extensionName != ".ogg") {
+            std::cout << "Error 6 : Extension name of bg music is not correct" << std::endl;
+            return 6;
+        }
+        bg_music = temp;
+
+        std::getline(file, temp);
+    }
+
     std::getline(file, temp, ';');
     std::cout << temp << std::endl;
     if (temp != "TEXTURES") {
-        std::cout << "Error 5 : Textures not found" << std::endl;
-        return 5;
+        std::cout << "Error 7 : Textures not found" << std::endl;
+        return 7;
     }
 
     std::getline(file, temp, ';');
@@ -148,8 +172,8 @@ int LoadMap() {
     std::getline(file, temp, ';');
     std::cout << temp << std::endl;
     if (temp != "BACKGROUND") {
-        std::cout << "Error 6 : Background not found" << std::endl;
-        return 6;
+        std::cout << "Error 8 : Background not found" << std::endl;
+        return 8;
     }
 
     std::getline(file, temp, ';');
@@ -185,8 +209,8 @@ int LoadMap() {
     std::getline(file, temp, ';');
     std::cout << temp << std::endl;
     if (temp != "FOREGROUND") {
-        std::cout << "Error 7 : Foreground not found" << std::endl;
-        return 7;
+        std::cout << "Error 9 : Foreground not found" << std::endl;
+        return 9;
     }
 
     std::getline(file, temp, ';');
@@ -222,8 +246,8 @@ int LoadMap() {
     std::getline(file, temp, ';');
     std::cout << temp << std::endl;
     if (temp != "OBJECTS") {
-        std::cout << "Error 8 : Objects not found" << std::endl;
-        return 8;
+        std::cout << "Error 10 : Objects not found" << std::endl;
+        return 10;
     }
 
     std::getline(file, temp, ';');
@@ -279,7 +303,7 @@ bool Collision(Vector3 pos) {
         for (size_t j = 0; j < objects_w; j++)
         {
             if (fg_positions[i][j].x == pos.x && fg_positions[i][j].y == pos.y && fg_positions[i][j].z == pos.z) {
-                if (objects[i][j] != "0") { return true; }
+                if (objects[i][j] != "0" && objects[i][j] != "E") { return true; }
             }
         }
     }
@@ -292,7 +316,20 @@ bool Destructible(Vector3 pos) {
         for (size_t j = 0; j < objects_w; j++)
         {
             if (fg_positions[i][j].x == pos.x && fg_positions[i][j].y == pos.y && fg_positions[i][j].z == pos.z) {
-                if (objects[i][j] == "D") { return true; }
+                if (objects[i][j] == "D" || objects[i][j] == "U") { return true; }
+            }
+        }
+    }
+    return false;
+}
+
+bool PowerUp(Vector3 pos) {
+    for (size_t i = 0; i < objects_h; i++)
+    {
+        for (size_t j = 0; j < objects_w; j++)
+        {
+            if (fg_positions[i][j].x == pos.x && fg_positions[i][j].y == pos.y && fg_positions[i][j].z == pos.z) {
+                if (objects[i][j] == "E") { return true; }
             }
         }
     }
@@ -306,23 +343,65 @@ void Destroy(Vector3 pos) {
         {
             if (fg_positions[i][j].x == pos.x && fg_positions[i][j].y == pos.y && fg_positions[i][j].z == pos.z) 
             {
+                //Modificamos mapa
                 foreground[i][j] = "0";
-                objects[i][j] = "0";
+
+                if (objects[i][j] == "U") 
+                {
+                    objects[i][j] = "E";
+                    Vector3 newPowerUp = { pos.x, 1, pos.z };
+                    powerUps.push_back(newPowerUp);
+                    return;
+                }
+                else if (objects[i][j] == "D") 
+                {
+                    objects[i][j] = "0";
+                    return;
+                }
             }
         }
     }
 }
 
-int draw()
+void PickPowerUp(Vector3 pos) {
+    for (size_t i = 0; i < objects_h; i++)
+    {
+        for (size_t j = 0; j < objects_w; j++)
+        {
+            if (fg_positions[i][j].x == pos.x && fg_positions[i][j].y == pos.y && fg_positions[i][j].z == pos.z)
+            {
+                //Modificamos mapa
+                if (objects[i][j] == "E") {
+                    objects[i][j] = "0";
+                }
+
+                //Eliminamos power up del vector recorriendo el vector y viendo si coincide la posición
+                if (powerUps.size() > 0) {
+                    for (int i = 0; i < powerUps.size(); i++)
+                    {
+                        if (powerUps[i].x == pos.x && powerUps[i].z == pos.z) {
+                            powerUps.erase(powerUps.begin() + i);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+int Draw()
 {
     // Initialization
         //--------------------------------------------------------------------------------------
     const int screenWidth = 1600;
     const int screenHeight = 900;
 
-    InitWindow(screenWidth, screenHeight, "Mi tremendo juego");
+    InitWindow(screenWidth, screenHeight, title.c_str());
 
     LoadTextures();
+
+    
 
     // Define the camera to look into our 3d world
     Camera3D camera = { 0 };
@@ -390,6 +469,7 @@ int draw()
                 newPlayer->num = 1;
                 newPlayer->dead = false;
                 players.push_back(newPlayer);
+                //std::cout << " PLAYER 1 POSITION: " << newPlayer->position.x << newPlayer->position.y << newPlayer->position.z << std::endl;
             }
             else if (objects[i][j] == "2") {
                 objects[i][j] = "0";
@@ -415,6 +495,8 @@ int draw()
         //----------------------------------------------------------------------------------
         float deltaTime = GetFrameTime();
 
+
+        //Inserto bombas en el vector para luego dibujarlas si vector.size > 0
         if (IsKeyPressed(KEY_SPACE) && players[0]->maxBombs > player1Bombs.size()) {
             Bombs* newBomb = new Bombs;
             newBomb->pos_x = players[0]->position.x;
@@ -436,12 +518,14 @@ int draw()
 
         // Draw
         //----------------------------------------------------------------------------------
+
         BeginDrawing();
 
         ClearBackground(RAYWHITE);
 
         BeginMode3D(camera);
 
+        //Render background
         for (size_t i = 0; i < background_h; i++)
         {
             for (size_t j = 0; j < background_w; j++)
@@ -449,16 +533,15 @@ int draw()
                 if (background[i][j] == "C") {
                     std::string t = background[i][j];
                     DrawCubeTexture(level_textures[t], positions[i][j], 1.0f, 1.0f, 1.0f, WHITE);
-                    //DrawCubeWires(positions[i][j], 1.02f, 1.02f, 1.02f, DARKBROWN);
                 }
                 if (background[i][j] == "V") {
                     std::string t = background[i][j];
                     DrawCubeTexture(level_textures[t], positions[i][j], 1.0f, 1.0f, 1.0f, WHITE);
-                    //DrawCubeWires(positions[i][j], 1.02f, 1.02f, 1.02f, DARKBROWN);
                 }
             }
         }
 
+        //Render foreground
         for (size_t i = 0; i < foreground_h; i++)
         {
             for (size_t j = 0; j < foreground_w; j++)
@@ -466,23 +549,19 @@ int draw()
                 if (foreground[i][j] == "L") {
                     std::string t = foreground[i][j];
                     DrawCubeTexture(level_textures[t], fg_positions[i][j], 1.0f, 1.0f, 1.0f, WHITE);
-                    //DrawCubeWires(fg_positions[i][j], 1.02f, 1.02f, 1.02f, DARKGRAY);
                 }
                 else if (foreground[i][j] == "P") {
                     std::string t = foreground[i][j];
                     DrawCubeTexture(level_textures[t], fg_positions[i][j], 1.0f, 1.0f, 1.0f, WHITE);
-                    //DrawCubeWires(fg_positions[i][j], 1.02f, 1.02f, 1.02f, GRAY);
                 }
                 else if (foreground[i][j] == "T") {
                     std::string t = foreground[i][j];
                     DrawCubeTexture(level_textures[t], fg_positions[i][j], 1.0f, 1.0f, 1.0f, WHITE);
-                    //DrawCubeWires(fg_positions[i][j], 1.02f, 1.02f, 1.02f, BLACK);
                 }
-                //DrawCube(fg_positions[i][j], 1.0f, 1.0f, 1.0f, GREEN);
-                //DrawCubeWires(fg_positions[i][j], 1.02f, 1.02f, 1.02f, DARKGREEN);
             }
         }
 
+        //Players render and input
         for (int i = 0; i < players.size(); i++)
         {
             if (players[i]->num == 1) {
@@ -491,18 +570,34 @@ int draw()
                 if (IsKeyPressed(KEY_D) && !Collision({ players[i]->position.x + 1, players[i]->position.y, players[i]->position.z })) {
 
                     players[i]->position = { players[i]->position.x + 1, players[i]->position.y, players[i]->position.z };
+                    if (PowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z })) {
+                         players[i]->maxBombs++;
+                        PickPowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z });
+                    }
                 }
                 else if (IsKeyPressed(KEY_A) && !Collision({ players[i]->position.x - 1, players[i]->position.y, players[i]->position.z })) {
 
                     players[i]->position = { players[i]->position.x - 1, players[i]->position.y, players[i]->position.z };
+                    if (PowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z })) {
+                        players[i]->maxBombs++;
+                        PickPowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z });
+                    }
                 }
                 else if (IsKeyPressed(KEY_W) && !Collision({ players[i]->position.x, players[i]->position.y, players[i]->position.z - 1 })) {
 
                     players[i]->position = { players[i]->position.x, players[i]->position.y, players[i]->position.z - 1 };
+                    if (PowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z })) {
+                        players[i]->maxBombs++;
+                        PickPowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z });
+                    }
                 }
                 else if (IsKeyPressed(KEY_S) && !Collision({ players[i]->position.x, players[i]->position.y, players[i]->position.z + 1 })) {
 
                     players[i]->position = { players[i]->position.x, players[i]->position.y, players[i]->position.z + 1 };
+                    if (PowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z })) {
+                        players[i]->maxBombs++;
+                        PickPowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z });
+                    }
                 }
 
                 if (!players[i]->dead) {
@@ -516,18 +611,34 @@ int draw()
                 if (IsKeyPressed(KEY_RIGHT) && !Collision({ players[i]->position.x + 1, players[i]->position.y, players[i]->position.z })) {
 
                     players[i]->position = { players[i]->position.x + 1, players[i]->position.y, players[i]->position.z };
+                    if (PowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z })) {
+                        players[i]->maxBombs++;
+                        PickPowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z });
+                    }
                 }
                 else if (IsKeyPressed(KEY_LEFT) && !Collision({ players[i]->position.x - 1, players[i]->position.y, players[i]->position.z })) {
 
                     players[i]->position = { players[i]->position.x - 1, players[i]->position.y, players[i]->position.z };
+                    if (PowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z })) {
+                        players[i]->maxBombs++;
+                        PickPowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z });
+                    }
                 }
                 else if (IsKeyPressed(KEY_UP) && !Collision({ players[i]->position.x, players[i]->position.y, players[i]->position.z - 1 })) {
 
                     players[i]->position = { players[i]->position.x, players[i]->position.y, players[i]->position.z - 1 };
+                    if (PowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z })) {
+                        players[i]->maxBombs++;
+                        PickPowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z });
+                    }
                 }
                 else if (IsKeyPressed(KEY_DOWN) && !Collision({ players[i]->position.x, players[i]->position.y, players[i]->position.z + 1 })) {
 
                     players[i]->position = { players[i]->position.x, players[i]->position.y, players[i]->position.z + 1 };
+                    if (PowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z })) {
+                        players[i]->maxBombs++;
+                        PickPowerUp({ players[i]->position.x, players[i]->position.y, players[i]->position.z });
+                    }
                 }
                 if (!players[i]->dead) {
                     DrawSphere(players[i]->position, 0.4f, players[i]->color);
@@ -537,6 +648,7 @@ int draw()
         }
 
 
+        //Bombs render and logic
         if (player1Bombs.size() > 0) {
             for (int i = 0; i < player1Bombs.size(); i++)
             {
@@ -550,12 +662,24 @@ int draw()
                         Destroy({ player1Bombs[i]->pos_x + 1, 1, player1Bombs[i]->pos_z });
                     }
                     else if (Destructible({ player1Bombs[i]->pos_x - 1, 1, player1Bombs[i]->pos_z })) {
+                        if (PowerUp({ player1Bombs[i]->pos_x - 1, 1, player1Bombs[i]->pos_z })) {
+                            Vector3 newPowerUp = { player1Bombs[i]->pos_x - 1, 1, player1Bombs[i]->pos_z };
+                            powerUps.push_back(newPowerUp);
+                        }
                         Destroy({ player1Bombs[i]->pos_x - 1, 1, player1Bombs[i]->pos_z });
                     }
                     else if (Destructible({ player1Bombs[i]->pos_x, 1, player1Bombs[i]->pos_z + 1})) {
+                        if (PowerUp({ player1Bombs[i]->pos_x, 1, player1Bombs[i]->pos_z + 1 })) {
+                            Vector3 newPowerUp = { player1Bombs[i]->pos_x, 1, player1Bombs[i]->pos_z + 1 };
+                            powerUps.push_back(newPowerUp);
+                        }
                         Destroy({ player1Bombs[i]->pos_x, 1, player1Bombs[i]->pos_z + 1});
                     }
                     else if (Destructible({ player1Bombs[i]->pos_x, 1, player1Bombs[i]->pos_z -1})) {
+                        if (PowerUp({ player1Bombs[i]->pos_x, 1, player1Bombs[i]->pos_z - 1 })) {
+                            Vector3 newPowerUp = { player1Bombs[i]->pos_x, 1, player1Bombs[i]->pos_z - 1 };
+                            powerUps.push_back(newPowerUp);
+                        }
                         Destroy({ player1Bombs[i]->pos_x, 1, player1Bombs[i]->pos_z -1});
                     }
                     //Miramos si hay players
@@ -607,17 +731,33 @@ int draw()
                     DrawSphere({ player2Bombs[i]->pos_x, 1.0f, player2Bombs[i]->pos_z }, 0.1 + 0.2f * abs(sin(player2Bombs[i]->timeToExplode * 2)), BLACK);
                 }
                 else if (player2Bombs[i]->timeToExplode < 0) {
-                    //Miramos las 4 direcciones si hay un destructible en objects
+                    //Miramos las 4 direcciones si hay un destructible en objects y si es power up o no
                     if (Destructible({ player2Bombs[i]->pos_x + 1, 1, player2Bombs[i]->pos_z })) {
+                        if (PowerUp({ player2Bombs[i]->pos_x + 1, 1, player2Bombs[i]->pos_z })) {
+                            Vector3 newPowerUp = { player2Bombs[i]->pos_x + 1, 1, player2Bombs[i]->pos_z };
+                            powerUps.push_back(newPowerUp);
+                        }
                         Destroy({ player2Bombs[i]->pos_x + 1, 1, player2Bombs[i]->pos_z });
                     }
                     else if (Destructible({ player2Bombs[i]->pos_x - 1, 1, player2Bombs[i]->pos_z })) {
+                        if (PowerUp({ player2Bombs[i]->pos_x - 1, 1, player2Bombs[i]->pos_z })) {
+                            Vector3 newPowerUp = { player2Bombs[i]->pos_x - 1, 1, player2Bombs[i]->pos_z };
+                            powerUps.push_back(newPowerUp);
+                        }
                         Destroy({ player2Bombs[i]->pos_x - 1, 1, player2Bombs[i]->pos_z });
                     }
                     else if (Destructible({ player2Bombs[i]->pos_x, 1, player2Bombs[i]->pos_z + 1 })) {
+                        if (PowerUp({ player2Bombs[i]->pos_x, 1, player2Bombs[i]->pos_z + 1 })) {
+                            Vector3 newPowerUp = { player2Bombs[i]->pos_x, 1, player2Bombs[i]->pos_z + 1 };
+                            powerUps.push_back(newPowerUp);
+                        }
                         Destroy({ player2Bombs[i]->pos_x, 1, player2Bombs[i]->pos_z + 1 });
                     }
                     else if (Destructible({ player2Bombs[i]->pos_x, 1, player2Bombs[i]->pos_z - 1 })) {
+                        if (PowerUp({ player2Bombs[i]->pos_x, 1, player2Bombs[i]->pos_z - 1 })) {
+                            Vector3 newPowerUp = { player2Bombs[i]->pos_x, 1, player2Bombs[i]->pos_z - 1 };
+                            powerUps.push_back(newPowerUp);
+                        }
                         Destroy({ player2Bombs[i]->pos_x, 1, player2Bombs[i]->pos_z - 1 });
                     }
                     //Miramos si hay players
@@ -660,10 +800,19 @@ int draw()
                 }
             }
         }
-        //DrawCube(fg_initialPos, 1.0f, 1.0f, 1.0f, GREEN);
+
+        if (powerUps.size() > 0) 
+        {
+            for (int i = 0; i < powerUps.size(); i++)
+            {
+                DrawCube(powerUps[i], 0.4f, 0.4f, 0.4f, RED);
+            }
+        }
+
+
+        //DrawCube(fg_initialPos, 1.0f, 1.0f, 1.0f, GREEN);f
         //DrawCube(initialPos, 1.0f, 1.0f, 1.0f, RED);
         //DrawCubeWires(cubePosition, 2.0f, 2.0f, 2.0f, MAROON);
-
         //DrawGrid(10, 1.0f);
 
         EndMode3D();
@@ -687,6 +836,9 @@ int draw()
 
 
 int main(void) {
+
     LoadMap();
-    draw();
+
+    //Game loop
+    Draw();
 }
