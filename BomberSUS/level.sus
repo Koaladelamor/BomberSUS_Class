@@ -1,6 +1,7 @@
-SUS;0.5;;
+SUS;1.0;;
 TITLE;Mi tremendo juego;;
-MUSIC;temaso.ogg;;
+MUSIC;old.ogg;;
+CAMERA_HEIGHT;20;;
 TEXTURES;5;;
 C;dirt1.png;;
 V;dirt2.png;;

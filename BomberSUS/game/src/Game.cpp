@@ -23,9 +23,12 @@
 // Program main entry point
 //------------------------------------------------------------------------------------
 
+bool gameOver = false;
+bool player1Wins = false;
+bool player2Wins = false;
 float version = 0.0;
-std::string bg_music = "";
-
+std::string bgMusic_string = "";
+float cameraHeight = 0.0;
 std::string title = "";
 int totalTextures = 0;
 std::map<std::string, std::string> textures;
@@ -67,11 +70,14 @@ std::vector <Bombs*> player2Bombs;
 
 std::vector <Vector3> powerUps;
 
+
 int LoadMap() {
     std::string temp;
     std::fstream file;
 
     file.open("level.sus", std::ifstream::in);
+
+    //Open file and check format
 
     if (!file.is_open()) {
         file.close();
@@ -92,6 +98,8 @@ int LoadMap() {
     version = std::stof(temp);
 
     std::getline(file, temp);
+
+    //Title
 
     std::getline(file, temp, ';');
     std::cout << temp << std::endl;
@@ -114,6 +122,8 @@ int LoadMap() {
 
     std::getline(file, temp);
 
+    //Music
+
     if (version >= 0.5) {
         std::getline(file, temp, ';');
         std::cout << temp << std::endl;
@@ -127,19 +137,38 @@ int LoadMap() {
         std::string extensionName = temp.substr(temp.find("."));
         std::cout << "EXTENSION NAME IS: " << extensionName << std::endl;
         if (extensionName != ".ogg") {
-            std::cout << "Error 6 : Extension name of bg music is not correct" << std::endl;
+            std::cout << "Error 6 : Extension name of bg music is not correct. Need .ogg" << std::endl;
             return 6;
         }
-        bg_music = temp;
+        bgMusic_string = temp;
 
         std::getline(file, temp);
     }
 
+    //Camera Height
+
+    if (version >= 1.0) {
+        std::getline(file, temp, ';');
+        std::cout << temp << std::endl;
+        if (temp != "CAMERA_HEIGHT") {
+            std::cout << "Error 7 : Camera height not found" << std::endl;
+            return 7;
+        }
+
+        std::getline(file, temp, ';');
+        std::cout << temp << std::endl;
+        cameraHeight = std::stof(temp);
+
+        std::getline(file, temp);
+    }
+
+    //Textures
+
     std::getline(file, temp, ';');
     std::cout << temp << std::endl;
     if (temp != "TEXTURES") {
-        std::cout << "Error 7 : Textures not found" << std::endl;
-        return 7;
+        std::cout << "Error 8 : Textures not found" << std::endl;
+        return 8;
     }
 
     std::getline(file, temp, ';');
@@ -164,16 +193,14 @@ int LoadMap() {
         std::getline(file, temp);
     }
 
-    //Image image = LoadImage("grass.png");
-    //Texture2D cubicmap = LoadTextureFromImage(image);
 
     //BACKGROUND
 
     std::getline(file, temp, ';');
     std::cout << temp << std::endl;
     if (temp != "BACKGROUND") {
-        std::cout << "Error 8 : Background not found" << std::endl;
-        return 8;
+        std::cout << "Error 9 : Background not found" << std::endl;
+        return 9;
     }
 
     std::getline(file, temp, ';');
@@ -209,8 +236,8 @@ int LoadMap() {
     std::getline(file, temp, ';');
     std::cout << temp << std::endl;
     if (temp != "FOREGROUND") {
-        std::cout << "Error 9 : Foreground not found" << std::endl;
-        return 9;
+        std::cout << "Error 10 : Foreground not found" << std::endl;
+        return 10;
     }
 
     std::getline(file, temp, ';');
@@ -246,8 +273,8 @@ int LoadMap() {
     std::getline(file, temp, ';');
     std::cout << temp << std::endl;
     if (temp != "OBJECTS") {
-        std::cout << "Error 10 : Objects not found" << std::endl;
-        return 10;
+        std::cout << "Error 11 : Objects not found" << std::endl;
+        return 11;
     }
 
     std::getline(file, temp, ';');
@@ -405,7 +432,7 @@ int Draw()
 
     // Define the camera to look into our 3d world
     Camera3D camera = { 0 };
-    camera.position = { 0.0f, 15.0f, 2.0f };  // Camera position
+    camera.position = { 0.0f, cameraHeight, 2.0f };  // Camera position
     camera.target = { 0.0f, 0.0f, 0.0f };      // Camera looking at point
     camera.up = { 0.0f, 1.0f, 0.0f };          // Camera up vector (rotation towards target)
     camera.fovy = 45.0f;                                // Camera field-of-view Y
@@ -484,6 +511,10 @@ int Draw()
         }
     }
 
+    Music bgMusic = LoadMusicStream(bgMusic_string.c_str());
+    bgMusic.looping = true;
+    PlayMusicStream(bgMusic);
+
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
 
@@ -495,6 +526,7 @@ int Draw()
         //----------------------------------------------------------------------------------
         float deltaTime = GetFrameTime();
 
+        UpdateMusicStream(bgMusic);
 
         //Inserto bombas en el vector para luego dibujarlas si vector.size > 0
         if (IsKeyPressed(KEY_SPACE) && players[0]->maxBombs > player1Bombs.size()) {
@@ -814,10 +846,30 @@ int Draw()
         //DrawCube(initialPos, 1.0f, 1.0f, 1.0f, RED);
         //DrawCubeWires(cubePosition, 2.0f, 2.0f, 2.0f, MAROON);
         //DrawGrid(10, 1.0f);
+        //DrawText("Welcome to the third dimension!", 20, 40, 20, DARKGRAY);
+
+
 
         EndMode3D();
 
-        //DrawText("Welcome to the third dimension!", 10, 40, 20, DARKGRAY);
+        if (!gameOver) {
+            if (players[1]->dead) {
+                player1Wins = true;
+                gameOver = true;
+            }
+            else if (players[0]->dead) {
+                player2Wins = true;
+                gameOver = true;
+            }
+        }
+
+        if (player1Wins) {
+            DrawText("Player 1 wins!", screenWidth / 2, 40, 20, DARKGRAY);
+
+        }
+        if (player2Wins) {
+            DrawText("Player 2 wins!", screenWidth / 2, 40, 20, DARKGRAY);
+        }
 
         DrawFPS(10, 10);
 
@@ -836,8 +888,9 @@ int Draw()
 
 
 int main(void) {
-
+    //Init
     LoadMap();
+    InitAudioDevice();
 
     //Game loop
     Draw();
