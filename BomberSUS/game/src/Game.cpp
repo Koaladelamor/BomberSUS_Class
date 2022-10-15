@@ -28,7 +28,7 @@ bool player1Wins = false;
 bool player2Wins = false;
 float version = 0.0;
 std::string bgMusic_string = "";
-float cameraHeight = 0.0;
+float cameraHeight = -1.0;
 std::string title = "";
 int totalTextures = 0;
 std::map<std::string, std::string> textures;
@@ -75,7 +75,7 @@ int LoadMap() {
     std::string temp;
     std::fstream file;
 
-    file.open("level.sus", std::ifstream::in);
+    file.open("lucia_level.sus", std::ifstream::in);
 
     //Open file and check format
 
@@ -162,6 +162,13 @@ int LoadMap() {
         std::getline(file, temp);
     }
 
+    if (version <= 0.21) {
+        std::getline(file, temp);
+        std::getline(file, temp);
+    }
+    else if (version <= 0.51) {
+        std::getline(file, temp);
+    }
     //Textures
 
     std::getline(file, temp, ';');
@@ -232,7 +239,7 @@ int LoadMap() {
     }
 
     //FOREGROUND
-    std::getline(file, temp);
+    //std::getline(file, temp);
     std::getline(file, temp, ';');
     std::cout << temp << std::endl;
     if (temp != "FOREGROUND") {
@@ -432,7 +439,9 @@ int Draw()
 
     // Define the camera to look into our 3d world
     Camera3D camera = { 0 };
-    camera.position = { 0.0f, cameraHeight, 2.0f };  // Camera position
+    if (cameraHeight < 0) {
+        camera.position = { 0.0f, 20.0f, 2.0f };  // Camera position
+    }
     camera.target = { 0.0f, 0.0f, 0.0f };      // Camera looking at point
     camera.up = { 0.0f, 1.0f, 0.0f };          // Camera up vector (rotation towards target)
     camera.fovy = 45.0f;                                // Camera field-of-view Y
@@ -510,10 +519,13 @@ int Draw()
             }
         }
     }
-
-    Music bgMusic = LoadMusicStream(bgMusic_string.c_str());
-    bgMusic.looping = true;
-    PlayMusicStream(bgMusic);
+    Music bgMusic;
+    if (version >= 0.5) {
+        InitAudioDevice();
+        bgMusic = LoadMusicStream(bgMusic_string.c_str());
+        bgMusic.looping = true;
+        PlayMusicStream(bgMusic);
+    }
 
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
@@ -526,8 +538,9 @@ int Draw()
         //----------------------------------------------------------------------------------
         float deltaTime = GetFrameTime();
 
-        UpdateMusicStream(bgMusic);
-
+        if (version >= 0.5) {
+            UpdateMusicStream(bgMusic);
+        }
         //Inserto bombas en el vector para luego dibujarlas si vector.size > 0
         if (IsKeyPressed(KEY_SPACE) && players[0]->maxBombs > player1Bombs.size()) {
             Bombs* newBomb = new Bombs;
@@ -890,7 +903,7 @@ int Draw()
 int main(void) {
     //Init
     LoadMap();
-    InitAudioDevice();
+    
 
     //Game loop
     Draw();
