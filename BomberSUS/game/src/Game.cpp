@@ -23,6 +23,8 @@
 // Program main entry point
 //------------------------------------------------------------------------------------
 
+#pragma region Variables
+
 bool gameOver = false;
 bool player1Wins = false;
 bool player2Wins = false;
@@ -32,7 +34,6 @@ float cameraHeight = -1.0;
 std::string title = "";
 int totalTextures = 0;
 std::map<std::string, std::string> textures;
-
 std::map<std::string, Texture2D> level_textures;
 
 int background_w = 0;
@@ -70,12 +71,13 @@ std::vector <Bombs*> player2Bombs;
 
 std::vector <Vector3> powerUps;
 
+#pragma endregion
 
 int LoadMap() {
     std::string temp;
     std::fstream file;
 
-    file.open("lucia_level.sus", std::ifstream::in);
+    file.open("level.sus", std::ifstream::in);
 
     //Open file and check format
 
@@ -239,7 +241,6 @@ int LoadMap() {
     }
 
     //FOREGROUND
-    //std::getline(file, temp);
     std::getline(file, temp, ';');
     std::cout << temp << std::endl;
     if (temp != "FOREGROUND") {
@@ -307,12 +308,12 @@ int LoadMap() {
             std::getline(file, temp, ';');
 
             objects[i][j] = temp;
-            /*if (j == objects_w - 1) {
+            if (j == objects_w - 1) {
                 std::cout << objects[i][j];
             }
             else {
                 std::cout << objects[i][j] << " - ";
-            }*/
+            }
         }
         std::getline(file, temp);
         std::cout << std::endl;
@@ -439,13 +440,21 @@ int Draw()
 
     // Define the camera to look into our 3d world
     Camera3D camera = { 0 };
-    if (cameraHeight < 0) {
+    if (version >= 1.0) {
+        camera.position = { 0.0f, cameraHeight, 2.0f };  // Camera position
+    }
+    else {
         camera.position = { 0.0f, 20.0f, 2.0f };  // Camera position
     }
     camera.target = { 0.0f, 0.0f, 0.0f };      // Camera looking at point
     camera.up = { 0.0f, 1.0f, 0.0f };          // Camera up vector (rotation towards target)
     camera.fovy = 45.0f;                                // Camera field-of-view Y
     camera.projection = CAMERA_PERSPECTIVE;             // Camera mode type
+
+#pragma region MapInit
+
+
+
 
     float x_margin = background_w % 2 == 0 ? .5 : 0;
     float z_margin = background_h % 2 == 0 ? .5 : 0;
@@ -519,6 +528,8 @@ int Draw()
             }
         }
     }
+#pragma endregion
+
     Music bgMusic;
     if (version >= 0.5) {
         InitAudioDevice();
