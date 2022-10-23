@@ -436,8 +436,6 @@ int Draw()
 
     LoadTextures();
 
-    
-
     // Define the camera to look into our 3d world
     Camera3D camera = { 0 };
     if (version >= 1.0) {
@@ -452,8 +450,6 @@ int Draw()
     camera.projection = CAMERA_PERSPECTIVE;             // Camera mode type
 
 #pragma region MapInit
-
-
 
 
     float x_margin = background_w % 2 == 0 ? .5 : 0;
@@ -476,6 +472,7 @@ int Draw()
     Vector3** positions = new Vector3 * [background_h];
     fg_positions = new Vector3 * [foreground_h];
 
+    // Guardamos las posiciones de cada casilla
     for (size_t i = 0; i < background_h; i++)
     {
         positions[i] = new Vector3[background_w];
@@ -501,6 +498,7 @@ int Draw()
         tempPos.x = fg_initialPos.x;
     }
 
+    // Guardamos la información de los jugadores
     for (size_t i = 0; i < objects_h; i++)
     {
         for (size_t j = 0; j < objects_w; j++)
@@ -525,6 +523,35 @@ int Draw()
                 newPlayer->num = 2;
                 newPlayer->dead = false;
                 players.push_back(newPlayer);
+            }
+        }
+    }
+    if (players.size() == 0) {
+        for (size_t i = 0; i < foreground_h; i++)
+        {
+            for (size_t j = 0; j < foreground_w; j++)
+            {
+                if (foreground[i][j] == "1") {
+                    foreground[i][j] = "0";
+                    Player* newPlayer = new Player;
+                    newPlayer->position = fg_positions[i][j];
+                    newPlayer->color = GREEN;
+                    newPlayer->maxBombs = 1;
+                    newPlayer->num = 1;
+                    newPlayer->dead = false;
+                    players.push_back(newPlayer);
+                    //std::cout << " PLAYER 1 POSITION: " << newPlayer->position.x << newPlayer->position.y << newPlayer->position.z << std::endl;
+                }
+                else if (foreground[i][j] == "2") {
+                    foreground[i][j] = "0";
+                    Player* newPlayer = new Player;
+                    newPlayer->position = fg_positions[i][j];
+                    newPlayer->color = RED;
+                    newPlayer->maxBombs = 1;
+                    newPlayer->num = 2;
+                    newPlayer->dead = false;
+                    players.push_back(newPlayer);
+                }
             }
         }
     }
@@ -586,13 +613,15 @@ int Draw()
         {
             for (size_t j = 0; j < background_w; j++)
             {
-                if (background[i][j] == "C") {
-                    std::string t = background[i][j];
-                    DrawCubeTexture(level_textures[t], positions[i][j], 1.0f, 1.0f, 1.0f, WHITE);
-                }
-                if (background[i][j] == "V") {
-                    std::string t = background[i][j];
-                    DrawCubeTexture(level_textures[t], positions[i][j], 1.0f, 1.0f, 1.0f, WHITE);
+                std::string t = background[i][j];
+                std::map<std::string, std::string>::iterator it;
+                for (it = textures.begin(); it != textures.end(); it++)
+                {
+                    //std::cout << it->first << " : " << it->second << std::endl;
+                    if (it->first == t) {
+                        DrawCubeTexture(level_textures[t], positions[i][j], 1.0f, 1.0f, 1.0f, WHITE);
+                    }
+
                 }
             }
         }
@@ -602,17 +631,16 @@ int Draw()
         {
             for (size_t j = 0; j < foreground_w; j++)
             {
-                if (foreground[i][j] == "L") {
-                    std::string t = foreground[i][j];
-                    DrawCubeTexture(level_textures[t], fg_positions[i][j], 1.0f, 1.0f, 1.0f, WHITE);
-                }
-                else if (foreground[i][j] == "P") {
-                    std::string t = foreground[i][j];
-                    DrawCubeTexture(level_textures[t], fg_positions[i][j], 1.0f, 1.0f, 1.0f, WHITE);
-                }
-                else if (foreground[i][j] == "T") {
-                    std::string t = foreground[i][j];
-                    DrawCubeTexture(level_textures[t], fg_positions[i][j], 1.0f, 1.0f, 1.0f, WHITE);
+
+                std::string t = foreground[i][j];
+                std::map<std::string, std::string>::iterator it;
+                for (it = textures.begin(); it != textures.end(); it++)
+                {
+                    //std::cout << it->first << " : " << it->second << std::endl;
+                    if (it->first == t) {
+                        DrawCubeTexture(level_textures[t], fg_positions[i][j], 1.0f, 1.0f, 1.0f, WHITE);
+                    }
+
                 }
             }
         }
@@ -909,12 +937,10 @@ int Draw()
     return 0;
 }
 
-
-
 int main(void) {
+
     //Init
     LoadMap();
-    
 
     //Game loop
     Draw();
